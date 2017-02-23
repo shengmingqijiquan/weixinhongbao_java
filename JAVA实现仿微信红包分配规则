@@ -1,0 +1,230 @@
+转载请注明出处：http://blog.csdn.net/xiaojimanman/article/details/50708860
+http://www.llwjy.com/blogdetail/80ad983554a0668be92b5b53a486c55e.html
+个人博客站已经上线了，网址 www.llwjy.com ~欢迎各位吐槽~
+-------------------------------------------------------------------------------------------------
+      最近过年发红包拜年成为一种新的潮流，作为程序猿对算法的好奇远远要大于对红包的好奇，这里介绍一种自己想到的一种随机红包分配策略，还请大家多多指教。
+
+算法介绍
+一、红包金额限制
+      对于微信红包，我们知道没人随机的最小红包是1分，最大金额是200元，这里我们同样来设置红包的范围，下面代码我们统一金钱的单位为分。
+[java]view plaincopyprint?
+//最小红包额度
+privatestaticfinalint MINMONEY = 1;  
+//最大红包额度
+privatestaticfinalint MAXMONEY = 200 * 100;  
+
+二、判断红包金额是否合法
+      注意这一步伴随着整个算法，我们不仅要在分配红包之前要判断金额是否合法，同样要在每个人暂定随机金额后也要判断剩余的金额是否合法。
+[java]view plaincopy
+print?
+privateboolean isRight(int money, int count) {  
+double avg = money / count;  
+if (avg < MINMONEY) {  
+returnfalse;  
+    }  
+if (avg > MAXMONEY) {  
+returnfalse;  
+    }  
+returntrue;  
+}  
+
+三、随机产生一个红包
+      这里我们采用随机的方式产生一个在MINMONEY和MAXMONEY之间的一个红包，产生红包之后，我们需要判断剩余的钱是否是合法红包，如果不是合法红包，我们就重新产生分配方案，在重新产生分配方案的时候，我们需要确定一个事情，是产生的红包过大还是过小，如果红包过大，下次就随机一个小值到本次红包金额的一个红包，如果红包金额过小，我们就产生一个红包金额到大值的一个红包。
+[java]view plaincopyprint?
+privateint random(int money, int minS, int maxS, int count) {  
+//红包数量为1，直接返回金额
+if (count == 1) {  
+return money;  
+    }  
+//如果最大金额和最小金额相等，直接返回金额
+if (minS == maxS) {  
+return minS;  
+    }  
+int max = maxS > money ? money : maxS;  
+//随机产生一个红包
+int one = ((int)Math.rint(Math.random() * (max - minS) + minS))  % max + 1;  
+int money1 = money - one;  
+//判断该种分配方案是否正确
+if (isRight(money1, count -1)) {  
+return one;  
+    } else {  
+double avg = money1 / (count - 1);  
+if (avg < MINMONEY) {  
+//递归调用，修改红包最大金额
+return random(money, minS, one, count);  
+        }elseif (avg > MAXMONEY) {  
+//递归调用，修改红包最小金额
+return random(money, one, maxS, count);  
+        }  
+    }  
+return one;  
+}  
+
+第三步优化
+首先感谢子冬童鞋给我提供的优化方案：在随机产生红包的时候，我们知道随机一个红包后，剩余的红包个数，这时我们又知道红包的最大值、最小值，那么我们就知道了剩余金额需要在一个范围内，因此也就知道了这个产生的随机红包的最值，所以每次产生下一个红包只需要一次随机即可。举个简单的例子，加入现在有一个5分4个的红包，每个红包要求至少1分，最大20000分，那么在分出第一个红包后，剩余3个红包的钱数要在1 * 3 = 3（分） 和 20000 * 3 = 60000（分）之间，因此也就是说，分配第一个红包的随机金额要在5 - 60000 = -59995（分）和 5 - 3 = 2（分）之间，又由于我们对红包的金额要求在1~20000之间，因此确定第一次随机金额的范围是[1分,2分]。这种随机产生红包的方案要远远优于第三步中提供的方案，在此再次感谢子冬同学提供的优化方案。我们只需要将下述方法替换源代码中的方法即可实现红包随机优化。
+[java]view plaincopy
+print?
+privateint random(int money, int minS, int maxS, int count) {  
+//红包数量为1，直接返回金额
+if (count == 1) {  
+return money;  
+    }  
+//如果最大金额和最小金额相等，直接返回金额
+if (minS == maxS) {  
+return minS;  
+    }  
+int max = maxS > money ? money : maxS;  
+//分配红包正确情况，允许红包的最大值
+int maxY = money - (count - 1) * minS;  
+//分配红包正确情况，允许红包的最小值
+int minY = money - (count - 1) * maxS;  
+//随机产生红包的最小值
+int min = minY > minS ? minY : minS;  
+//随机产生红包最大值
+    max = maxY < max ? maxY : max;  
+//随机产生一个红包
+return (int)Math.rint(Math.random() * (max - min) + min);  
+}  
+
+
+
+四、实现红包分配
+      这里为了避免某一个红包占用大量资金，我们需要设定非最后一个红包的最大金额，我们把他设置为红包金额平均值的N倍；有了一、二、三中的方法，我们就可以来实现红包的分配了。
+[java]view plaincopyprint?
+//每个红包最大是平均值的倍数
+privatestaticfinaldouble TIMES = 2.1;     
+public List splitRedPackets(int money, int count) {  
+if (!isRight(money, count)) {  
+returnnull;  
+    }  
+    List list = new ArrayList();  
+//红包最大金额为平均金额的TIMES倍
+int max = (int) (money * TIMES / count);  
+    max = max > MAXMONEY ? MAXMONEY : max;  
+for (int i = 0; i < count; i++) {  
+int one = random(money, MINMONEY, max, count - i);  
+        list.add(one);  
+        money -= one;  
+    }  
+return list;  
+}  
+
+
+红包分配方案评估
+      上面介绍了红包的基本算法，下面我们就对算法进行一次验证，假设有一个200元100份的红包，我们来看一下最后的分配方案。
+
+
+
+完整代码
+[java]view plaincopy
+print?
+/**  
+ *@Description:     
+ */
+package com.lulei.weixin.util;    
+import java.util.ArrayList;  
+import java.util.List;  
+import com.lulei.util.JsonUtil;  
+publicclass RedPacketUtil {  
+//最小红包额度
+privatestaticfinalint MINMONEY = 1;  
+//最大红包额度
+privatestaticfinalint MAXMONEY = 200 * 100;  
+//每个红包最大是平均值的倍数
+privatestaticfinaldouble TIMES = 2.1;  
+/**
+     * @param money
+     * @param count
+     * @return
+     * @Author:lulei  
+     * @Description: 拆分红包
+     */
+public List splitRedPackets(int money, int count) {  
+if (!isRight(money, count)) {  
+returnnull;  
+        }  
+        List list = new ArrayList();  
+//红包最大金额为平均金额的TIMES倍
+int max = (int) (money * TIMES / count);  
+        max = max > MAXMONEY ? MAXMONEY : max;  
+for (int i = 0; i < count; i++) {  
+int one = random(money, MINMONEY, max, count - i);  
+            list.add(one);  
+            money -= one;  
+        }  
+return list;  
+    }  
+/**
+     * @param money
+     * @param minS
+     * @param maxS
+     * @param count
+     * @return
+     * @Author:lulei  
+     * @Description: 随机红包额度
+     */
+privateint random(int money, int minS, int maxS, int count) {  
+//红包数量为1，直接返回金额
+if (count == 1) {  
+return money;  
+        }  
+//如果最大金额和最小金额相等，直接返回金额
+if (minS == maxS) {  
+return minS;  
+        }  
+int max = maxS > money ? money : maxS;  
+//随机产生一个红包
+int one = ((int)Math.rint(Math.random() * (max - minS) + minS))  % max + 1;  
+int money1 = money - one;  
+//判断该种分配方案是否正确
+if (isRight(money1, count -1)) {  
+return one;  
+        } else {  
+double avg = money1 / (count - 1);  
+if (avg < MINMONEY) {  
+//递归调用，修改红包最大金额
+return random(money, minS, one, count);  
+            }elseif (avg > MAXMONEY) {  
+//递归调用，修改红包最小金额
+return random(money, one, maxS, count);  
+            }  
+        }  
+return one;  
+    }  
+/**
+     * @param money
+     * @param count
+     * @return
+     * @Author:lulei  
+     * @Description: 此种红包是否合法
+     */
+privateboolean isRight(int money, int count) {  
+double avg = money / count;  
+if (avg < MINMONEY) {  
+returnfalse;  
+        }  
+if (avg > MAXMONEY) {  
+returnfalse;  
+        }  
+returntrue;  
+    }  
+publicstaticvoid main(String[] args) {  
+// TODO Auto-generated method stub  
+        RedPacketUtil util = new RedPacketUtil();  
+        System.out.println(JsonUtil.parseJson(util.splitRedPackets(20000, 100)));  
+    }  
+}  
+
+
+-------------------------------------------------------------------------------------------------
+小福利
+-------------------------------------------------------------------------------------------------
+      个人在极客学院上《Lucene案例开发》课程已经上线了，欢迎大家吐槽~
+第一课：Lucene概述
+第二课：Lucene 常用功能介绍
+第三课：网络爬虫
+第四课：数据库连接池
+第五课：小说网站的采集
+第六课：小说网站数据库操作
+第七课：小说网站分布式爬虫的实现
+第八课：Lucene实时搜索
